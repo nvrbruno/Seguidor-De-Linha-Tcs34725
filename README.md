@@ -97,3 +97,16 @@
 ```
 * Endereço padrão do TCA9548A.
 * Usado para alternar entre os canais conectados aos sensores TCS34725.
+
+---
+
+## 💌  Carta ao desenolvedor
+
+* Este projeto representa muito para mim. Há aproximadamente um ano, venho trabalhando em sua conclusão, enfrentando diversas barreiras.
+
+* A motivação central nasceu de um amor adquirido pela minha participação na OBR (Olimpíada Brasileira de Robótica) nos anos de 2024 e 2025 (e com a expectativa para 2026). Através desta competição, encontrei minha paixão pela mecatrônica e eletrônica, além de um grande desejo de um dia me tornar professor de robótica e levar minha escola ao topo da robótica nacional.
+
+* É um objetivo ambicioso, mas não faltarão esforços. Até lá, dedicarei-me ao que amo.
+
+### No final, uma frase prevalece neste projeto: "Muito mais que robôs"
+---
