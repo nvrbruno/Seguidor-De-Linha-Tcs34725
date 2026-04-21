@@ -3,152 +3,145 @@
 
 #define TCA_ADDR 0x70
 
-// Constante para o número de sensores
 const int NUM_SENSORES = 4;
 
-// Pinos do HC-SR04 adaptados para Arduino
-const int TRIG_PIN = 12; // Pino digital 12 para Trigger
-const int ECHO_PIN = 11; // Pino digital 11 para Echo
+// ── Pinos Ultrassônicos ────────────────────────────────────────────────────────
+const int TRIG_FRONTAL = 12;
+const int ECHO_FRONTAL = 11;
+const int TRIG_DIREITO = 8;  // Ajustar pino
+const int ECHO_DIREITO = 7;  // Ajustar pino
 
-// Canais do TCA9548A - Nomenclatura Padronizada
-const int CanalEsqExtremo = 1; 
-const int CanalEsq = 0;
-const int CanalDir = 5;
+// ── Canais TCA9548A ────────────────────────────────────────────────────────────
+const int CanalEsqExtremo = 1;
+const int CanalEsq        = 0;
+const int CanalDir        = 5;
 const int CanalDirExtremo = 4;
 
-// Sensores individuais - Nomenclatura Padronizada
+// ── Instâncias dos Sensores ────────────────────────────────────────────────────
 Adafruit_TCS34725 SensorEsqExtremo(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
-Adafruit_TCS34725 SensorEsq(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
-Adafruit_TCS34725 SensorDir(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
+Adafruit_TCS34725 SensorEsq       (TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
+Adafruit_TCS34725 SensorDir       (TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 Adafruit_TCS34725 SensorDirExtremo(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
-// Array para inicialização simplificada
-// Ordem: [EsqExtremo, Esq, Dir, DirExtremo]
-Adafruit_TCS34725* Sensores[NUM_SENSORES] = {&SensorEsqExtremo, &SensorEsq, &SensorDir, &SensorDirExtremo};
-uint8_t Canais[NUM_SENSORES] = {CanalEsqExtremo, CanalEsq, CanalDir, CanalDirExtremo};
+Adafruit_TCS34725* Sensores[NUM_SENSORES] = {
+    &SensorEsqExtremo, &SensorEsq, &SensorDir, &SensorDirExtremo
+};
+uint8_t Canais[NUM_SENSORES] = {
+    CanalEsqExtremo, CanalEsq, CanalDir, CanalDirExtremo
+};
+const char* NomesSensores[NUM_SENSORES] = {
+    "EsqExtremo", "ESQ", "DIR", "DirExtremo"
+};
 
-// Array de nomes para debug correspondente à ordem acima
-const char* NomesSensores[NUM_SENSORES] = {"EsqExtremo", "ESQ", "DIR", "DirExtremo"};
-
+// ── TCA9548A ───────────────────────────────────────────────────────────────────
 void tcaSelect(uint8_t canal) {
     Wire.beginTransmission(TCA_ADDR);
     Wire.write(1 << canal);
     Wire.endTransmission();
 }
 
-// FUNÇÃO DE LEITURA DE DISTÂNCIA
-float lerDistanciaCM() {
-    digitalWrite(TRIG_PIN, LOW);
+// ── Ultrassônico ───────────────────────────────────────────────────────────────
+// Lê distância em cm de um par TRIG/ECHO. Uso: lerDistancia(TRIG_FRONTAL, ECHO_FRONTAL);
+float lerDistancia(int trig, int echo) {
+    digitalWrite(trig, LOW);
     delayMicroseconds(2);
-
-    digitalWrite(TRIG_PIN, HIGH);
+    digitalWrite(trig, HIGH);
     delayMicroseconds(10);
-    digitalWrite(TRIG_PIN, LOW);
+    digitalWrite(trig, LOW);
 
-    long duracao = pulseIn(ECHO_PIN, HIGH, 30000);
-
-    if (duracao == 0) {
-        return 0.0; 
-    }
+    long duracao = pulseIn(echo, HIGH, 30000);
+    if (duracao == 0) return 400.0;
 
     float distancia = duracao * 0.0343 / 2.0;
-    
-    if (distancia > 400) {
-        return 400.0; 
-    }
-
-    return distancia;
+    return distancia > 400 ? 400.0 : distancia;
 }
 
+// ── Sensores de Cor ────────────────────────────────────────────────────────────
+struct LeituraSensores {
+    uint16_t cEsqExtremo;
+    uint16_t cEsq;
+    uint16_t cDir;
+    uint16_t cDirExtremo;
+};
+
+// Lê o canal C dos 4 sensores. Uso: LeituraSensores s = lerSensores();
+LeituraSensores lerSensores() {
+    LeituraSensores leitura;
+    uint16_t r, g, b, c;
+
+    tcaSelect(CanalEsqExtremo);
+    SensorEsqExtremo.getRawData(&r, &g, &b, &c);
+    leitura.cEsqExtremo = c;
+
+    tcaSelect(CanalEsq);
+    SensorEsq.getRawData(&r, &g, &b, &c);
+    leitura.cEsq = c;
+
+    tcaSelect(CanalDir);
+    SensorDir.getRawData(&r, &g, &b, &c);
+    leitura.cDir = c;
+
+    tcaSelect(CanalDirExtremo);
+    SensorDirExtremo.getRawData(&r, &g, &b, &c);
+    leitura.cDirExtremo = c;
+
+    return leitura;
+}
+
+// Retorna true se o valor C indicar preto. Uso: if (ePreto(s.cEsq)) { ... }
+bool ePreto(uint16_t c) {
+    return c < 800; // Calibrar
+}
+
+// ── Setup ──────────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
     Wire.begin();
-    
-    // Inicialização do Ultrassônico
-    pinMode(TRIG_PIN, OUTPUT);
-    pinMode(ECHO_PIN, INPUT);
+
+    pinMode(TRIG_FRONTAL, OUTPUT);
+    pinMode(ECHO_FRONTAL, INPUT);
+    pinMode(TRIG_DIREITO, OUTPUT);
+    pinMode(ECHO_DIREITO, INPUT);
 
     bool todosOK = false;
-
-    // Loop de inicialização com verificação individual
     while (!todosOK) {
         todosOK = true;
         for (uint8_t i = 0; i < NUM_SENSORES; i++) {
             tcaSelect(Canais[i]);
             if (!Sensores[i]->begin()) {
-                // Log que identifica o sensor falhado
                 Serial.print("Sensor ");
                 Serial.print(NomesSensores[i]);
-                Serial.print(" (Canal ");
-                Serial.print(Canais[i]);
-                Serial.println(") falhou na inicializacao.");
+                Serial.println(" falhou.");
                 todosOK = false;
             }
         }
-
-        // Log de erro geral
-        if (!todosOK) {
-            Serial.println("Erro: nem todos os sensores inicializaram.");
-            delay(1000);
-        }
+        if (!todosOK) delay(1000);
     }
 
-    Serial.println("Todos os sensores I2C inicializados!");
+    Serial.println("Sensores OK.");
 }
 
+// ── Loop ───────────────────────────────────────────────────────────────────────
 void loop() {
-    float distancia_cm;
-    // Variáveis para acumular a soma de cada componente dos 4 sensores
-    long soma_r = 0, soma_g = 0, soma_b = 0, soma_c = 0;
-    
-    // Leitura do Ultrassônico
-    distancia_cm = lerDistanciaCM();
-    Serial.print("Ultrassonico -> Distancia: ");
-    Serial.print(distancia_cm, 2);
-    Serial.println(" cm");
-    
-    // --- 1. LEITURA E SOMA DOS DADOS DE TODOS OS SENSORES ---
+    float distFrontal = lerDistancia(TRIG_FRONTAL, ECHO_FRONTAL);
+    float distDireito = lerDistancia(TRIG_DIREITO, ECHO_DIREITO);
+
+    Serial.print("Frontal: "); Serial.print(distFrontal, 2); Serial.println(" cm");
+    Serial.print("Direito: "); Serial.print(distDireito, 2); Serial.println(" cm");
+
+    LeituraSensores s = lerSensores();
+
     for (int i = 0; i < NUM_SENSORES; i++) {
         uint16_t r, g, b, c;
         tcaSelect(Canais[i]);
         Sensores[i]->getRawData(&r, &g, &b, &c);
-        
-        // Impressão individual (para debug)
         Serial.print(NomesSensores[i]);
-        Serial.print(" -> R:");
-        Serial.print(r);
-        Serial.print(" G:");
-        Serial.print(g);
-        Serial.print(" B:");
-        Serial.print(b);
-        Serial.print(" C:");
-        Serial.println(c);
-
-        // Soma para o cálculo da média
-        soma_r += r;
-        soma_g += g;
-        soma_b += b;
-        soma_c += c;
+        Serial.print(" -> R:"); Serial.print(r);
+        Serial.print(" G:");    Serial.print(g);
+        Serial.print(" B:");    Serial.print(b);
+        Serial.print(" C:");    Serial.println(c);
     }
-    
-    // --- 2. CÁLCULO DAS MÉDIAS POR COMPONENTE ---
-    // Faz a conversão (float) para garantir que o resultado tenha casas decimais
-    float media_r = (float)soma_r / NUM_SENSORES;
-    float media_g = (float)soma_g / NUM_SENSORES;
-    float media_b = (float)soma_b / NUM_SENSORES;
-    float media_c = (float)soma_c / NUM_SENSORES;
 
-    // --- 3. IMPRESSÃO DOS RESULTADOS FINAIS ---
-    Serial.println("MEDIAS GLOBAIS DOS SENSORES");
-    Serial.print("Media R: ");
-    Serial.println(media_r, 2);
-    Serial.print("Media G: ");
-    Serial.println(media_g, 2);
-    Serial.print("Media B: ");
-    Serial.println(media_b, 2);
-    Serial.print("Media C: ");
-    Serial.println(media_c, 2);
     Serial.println("-----------------------");
-
     delay(500);
 }
